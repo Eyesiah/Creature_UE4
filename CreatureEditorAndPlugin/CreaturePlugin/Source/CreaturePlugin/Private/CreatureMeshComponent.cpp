@@ -563,6 +563,13 @@ void UCreatureMeshComponent::UpdateCoreValues()
 void UCreatureMeshComponent::PrepareRenderData(CreatureCore &forCore)
 {
 	RecreateRenderProxy(true);
+
+	GetCore().ClearMeshModifier();
+	if (creature_particles_asset)
+	{
+		TryEnableParticles();
+	}
+
 	SetProceduralMeshTriData(forCore.GetProcMeshData(GetWorld()->WorldType));
 }
 
@@ -840,7 +847,14 @@ void UCreatureMeshComponent::DoCreatureMeshUpdate(int render_packet_idx, bool ma
 	FCProceduralMeshSceneProxy *localRenderProxy = GetLocalRenderProxy();
 	if (localRenderProxy)
 	{
-		int32 draw_indices_num = creature_core.shouldSkinSwap() ? creature_core.GetRealTotalIndicesNum() : -1;
+		if (creature_core.HasMeshModifier())
+		{
+			// Update mesh using modifier
+			creature_core.UpdateMeshModifier();
+		}
+
+		bool has_dynamic_indices = (creature_core.shouldSkinSwap() || creature_core.HasMeshModifier());
+		int32 draw_indices_num = has_dynamic_indices ? creature_core.GetRealTotalIndicesNum() : -1;
 		localRenderProxy->SetNeedsIndexUpdate(creature_core.should_update_render_indices, draw_indices_num);
 	}
 
@@ -1810,6 +1824,15 @@ void UCreatureMeshComponent::ProcessFrameCallbacks()
 				CreatureRepeatFrameCallbackEvent.Broadcast(frame_callback.name);
 			}
 		}
+	}
+}
+
+void UCreatureMeshComponent::TryEnableParticles()
+{
+	if ((GetWorld()->WorldType != EWorldType::Type::Editor) &&
+		(GetWorld()->WorldType != EWorldType::Type::EditorPreview))
+	{
+		creature_particles_asset->setupMeshModifier(GetCore());
 	}
 }
 
